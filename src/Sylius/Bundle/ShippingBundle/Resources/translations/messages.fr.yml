@@ -29,6 +29,7 @@ sylius:
             description: Description
             name: Nom
         shipping_method:
+            add_rule: Ajouter une règle
             calculator: Calculateur
             category: Catégorie
             category_requirement: Exigence de la catégorie
