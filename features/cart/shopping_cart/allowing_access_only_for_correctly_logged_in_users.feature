@@ -143,7 +143,8 @@ Feature: Allowing access only for correctly logged in users
         And the customer has specified address as "Ankh Morpork", "Frost Alley", "90210", "United States" for "Jon Snow"
         And the customer has completed the addressing step
         And the customer logged out
-        Then the visitor has no access to proceed with "UPS" shipping method in the customer cart
+        When the visitor try to proceed with "UPS" shipping method in the customer cart
+        Then the visitor has no access to customer's cart
 
     @api
     Scenario: Denying access to add payment method to the customer cart by the visitor
@@ -153,7 +154,8 @@ Feature: Allowing access only for correctly logged in users
         And the customer has completed the addressing step
         And the customer has proceeded "UPS" shipping method
         And the customer logged out
-        Then the visitor has no access to proceed with "offline" payment in the customer cart
+        When the visitor try to proceed with "offline" payment in the customer cart
+        Then the visitor has no access to customer's cart
 
     @api
     Scenario: Denying access to complete the customer cart by the visitor
@@ -164,14 +166,16 @@ Feature: Allowing access only for correctly logged in users
         And the customer has proceeded "UPS" shipping method
         And the customer has proceeded "offline" payment
         And the customer logged out
-        Then the visitor has no access to confirm the customer order
+        When the visitor try to confirm the customer order
+        Then the visitor has no access to customer's cart
 
     @api
     Scenario: Denying to increase quantity of an item in the customer cart by the visitor
         Given the customer logged in
         And the customer has product "Stark T-Shirt" in the cart
         And the customer logged out
-        Then the visitor has no access to change product "Stark T-Shirt" quantity to 2 in the customer cart
+        When the visitor try to change product "Stark T-Shirt" quantity to 2 in the customer cart
+        Then the visitor has no access to customer's cart
 
     @api
     Scenario: Accessing to the customers cart by the admin

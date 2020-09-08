@@ -79,7 +79,7 @@ final class CartContext implements Context
 
     /**
      * @When /^I see the summary of my (cart)$/
-     * @When /^the visitor try to see the summary of (?:customer|visitor)'s (cart)$/
+     * @When /^the (?:visitor|administrator) try to see the summary of (?:customer|visitor)'s (cart)$/
      * @When /^the (?:visitor|customer) see the summary of (?:their) (cart)$/
      */
     public function iSeeTheSummaryOfMyCart(string $tokenValue): void
@@ -193,6 +193,7 @@ final class CartContext implements Context
 
     /**
      * @Then /^my (cart) should be empty$/
+     * @Then /^the visitor has no access to customer's (cart)$/
      */
     public function myCartShouldBeEmpty(string $tokenValue): void
     {
@@ -291,19 +292,27 @@ final class CartContext implements Context
 
     /**
      * @Then I should see :productName with quantity :quantity in my cart
-     * @Then /^the (?:customer|visitor) should see product "([^"]+)" with quantity (\d+) in his cart$/
+     * @Then /^the administrator should see ("[^"]+" product) with quantity ([^"]+) in the (?:customer|visitor) cart$/
+     * @Then /^the (?:customer|visitor) should see (product "[^"]+") with quantity (\d+) in his cart$/
      */
-    public function iShouldSeeWithQuantityInMyCart(string $productName, int $quantity): void
-    {
-        $this->checkProductQuantity($this->cartsClient->getLastResponse(), $productName, $quantity);
-    }
+    public function iShouldSeeWithQuantityInMyCart(string $productName, int $quantity): void {
+        $cartResponse = $this->cartsClient->getLastResponse();
+        $items = $this->responseChecker->getValue($cartResponse, 'items');
 
-    /**
-     * @Then /^the administrator should see "([^"]+)" product with quantity (\d+) in the (?:customer|visitor) cart$/
-     */
-    public function theAdministratorShouldSeeProductWithQuantityInTheCart(string $productName, int $quantity): void
-    {
-        $this->checkProductQuantity($this->ordersAdminClient->getLastResponse(), $productName, $quantity, false);
+        foreach ($items as $item) {
+            $productResponse = $this->getProductForItem($item);
+
+            if ($this->responseChecker->hasTranslation($productResponse, 'en_US', 'name', $productName)) {
+                Assert::same(
+                    $item['quantity'],
+                    $quantity,
+                    SprintfResponseEscaper::provideMessageWithEscapedResponseContent(
+                        sprintf('Quantity did not match. Expected %s.', $quantity),
+                        $cartResponse
+                    )
+                );
+            }
+        }
     }
 
     /**
