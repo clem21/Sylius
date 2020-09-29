@@ -281,8 +281,9 @@ final class AccountContext implements Context
 
     /**
      * @When I view the summary of the order :order
+     * @When I view the summary of my order :order
      */
-    public function iViewTheSummaryOfTheOrder(OrderInterface $order)
+    public function iViewTheSummaryOfTheOrder(OrderInterface $order): void
     {
         $this->orderShowPage->open(['number' => $order->getNumber()]);
     }
@@ -298,8 +299,9 @@ final class AccountContext implements Context
 
     /**
      * @Then it should has number :orderNumber
+     * @Then it should have the number :orderNumber
      */
-    public function itShouldHasNumber($orderNumber)
+    public function itShouldHasNumber(string $orderNumber): void
     {
         Assert::same($this->orderShowPage->getNumber(), $orderNumber);
     }
