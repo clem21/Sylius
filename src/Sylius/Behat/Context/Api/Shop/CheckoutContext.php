@@ -767,14 +767,7 @@ final class CheckoutContext implements Context
     {
         $this->iCompleteTheAddressingStep();
 
-        /** @var Response $response */
-        $response = $this->client->getResponse();
-        Assert::same($response->getStatusCode(), 400);
-        Assert::true($this->isViolationWithMessageInResponse(
-            $response,
-            'Please select proper province.',
-            'shippingAddress'
-        ));
+        $this->assertProvinceMessage('shippingAddress');
     }
 
     /**
@@ -782,13 +775,19 @@ final class CheckoutContext implements Context
      */
     public function iShouldNotBeAbleToSpecifyProvinceNameManuallyForBillingAddress(): void
     {
+        $this->assertProvinceMessage('billingAddress');
+    }
+
+    private function assertProvinceMessage(string $addressType): void
+    {
         /** @var Response $response */
         $response = $this->client->getResponse();
+
         Assert::same($response->getStatusCode(), 400);
         Assert::true($this->isViolationWithMessageInResponse(
             $response,
             'Please select proper province.',
-            'billingAddress'
+            $addressType
         ));
     }
 
