@@ -390,6 +390,7 @@ final class CheckoutContext implements Context
      * @Given /^the (?:customer|visitor) has proceeded ("[^"]+" payment)$/
      * @Given /^the visitor try to proceed with ("[^"]+" payment) in the customer cart$/
      * @When /^I try to change payment method to ("[^"]+" payment)$/
+     * @When I change payment method to :paymentMethod
      */
     public function iChoosePaymentMethod(PaymentMethodInterface $paymentMethod): void
     {
@@ -823,27 +824,6 @@ final class CheckoutContext implements Context
     public function iTryToChangeQuantityToOfProductFromTheCart(int $quantity, ProductInterface $product, string $tokenValue): void
     {
         $this->putProductToCart($product, $tokenValue, $quantity);
-    }
-
-    /**
-     * @When I change payment method to :paymentMethod
-     */
-    public function iChangePaymentMethodTo(PaymentMethodInterface $paymentMethod): void
-    {
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf(
-                '/new-api/shop/orders/%s/change-payments/%s',
-                $this->sharedStorage->get('cart_token'),
-                (string) $this->iriConverter->getItemFromIri($this->getCart()['payments'][0])->getId()
-            ),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'paymentMethodCode' => $paymentMethod->getCode(),
-            ], \JSON_THROW_ON_ERROR)
-        );
     }
 
     /**
