@@ -23,7 +23,6 @@ use Sylius\Component\Core\Formatter\StringInflector;
 use Sylius\Component\Core\Model\AddressInterface;
 use Sylius\Component\Core\Model\CustomerInterface;
 use Sylius\Component\Core\Model\OrderInterface;
-use Sylius\Component\Core\Model\PaymentMethod;
 use Sylius\Component\Core\Model\PaymentMethodInterface;
 use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ShipmentInterface;
@@ -301,6 +300,7 @@ final class CheckoutContext implements Context
 
     /**
      * @Given I confirmed my order
+     * @Given I have confirmed order
      * @When I confirm my order
      * @When I try to confirm my order
      * @When /^the (?:visitor|customer) confirm his order$/
@@ -341,6 +341,7 @@ final class CheckoutContext implements Context
      * @Given /^the (?:visitor|customer) has proceeded ("[^"]+" shipping method)$/
      * @When /^the visitor try to proceed with ("[^"]+" shipping method) in the customer cart$/
      * @When I try to change shipping method to :shippingMethod
+     * @Given I have proceeded selecting :shippingMethod shipping method
      */
     public function iProceededWithShippingMethod(ShippingMethodInterface $shippingMethod): void
     {
@@ -390,7 +391,7 @@ final class CheckoutContext implements Context
      * @Given /^the (?:customer|visitor) has proceeded ("[^"]+" payment)$/
      * @Given /^the visitor try to proceed with ("[^"]+" payment) in the customer cart$/
      * @When /^I try to change payment method to ("[^"]+" payment)$/
-     * @When I change payment method to :paymentMethod
+     * @When I change payment method to :paymentMethod after checkout
      */
     public function iChoosePaymentMethod(PaymentMethodInterface $paymentMethod): void
     {
