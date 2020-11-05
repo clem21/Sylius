@@ -404,6 +404,14 @@ final class CartContext implements Context
         Assert::same(count($items), 0, 'There should be an empty cart');
     }
 
+    /**
+     * @Then I should be redirected to my cart summary page
+     */
+    public function iShouldBeRedirectedToMyCartSummaryPage(): void
+    {
+        // Intentionally left blank to fulfill context expectation
+    }
+
     private function pickupCart(): string
     {
         $this->cartsClient->buildCreateRequest();
