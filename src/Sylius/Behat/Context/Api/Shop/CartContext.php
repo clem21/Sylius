@@ -459,7 +459,7 @@ final class CartContext implements Context
         $this->cartsClient->executeCustomRequest($request);
     }
 
-    private function getProductForItem(array $item, bool $shopSection = true): Response
+    private function getProductForItem(array $item): Response
     {
         if (!isset($item['variant'])) {
             throw new \InvalidArgumentException(
@@ -468,8 +468,7 @@ final class CartContext implements Context
             );
         }
 
-        $variantIri = $shopSection ? str_replace('/admin/', '/shop/', $item['variant']) : $item['variant'];
-        $response = $this->cartsClient->showByIri(urldecode($variantIri));
+        $response = $this->cartsClient->showByIri(urldecode($item['variant']));
 
         $product = $this->responseChecker->getValue($response, 'product');
 
@@ -533,13 +532,12 @@ final class CartContext implements Context
     private function checkProductQuantity(
         Response $cartResponse,
         string $productName,
-        int $quantity,
-        bool $shopSection = true
+        int $quantity
     ): void {
         $items = $this->responseChecker->getValue($cartResponse, 'items');
 
         foreach ($items as $item) {
-            $productResponse = $this->getProductForItem($item, $shopSection);
+            $productResponse = $this->getProductForItem($item);
 
             if ($this->responseChecker->hasTranslation($productResponse, 'en_US', 'name', $productName)) {
                 Assert::same(
