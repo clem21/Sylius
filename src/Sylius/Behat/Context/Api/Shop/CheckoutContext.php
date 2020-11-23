@@ -30,8 +30,8 @@ use Sylius\Component\Core\OrderCheckoutStates;
 use Sylius\Component\Core\Repository\OrderRepositoryInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
 use Sylius\Component\Resource\Repository\RepositoryInterface;
-use Symfony\Component\BrowserKit\AbstractBrowser;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Request as HTTPRequest;
+use Sylius\Behat\Client\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Webmozart\Assert\Assert;
 
@@ -43,14 +43,8 @@ final class CheckoutContext implements Context
         'payment' => OrderCheckoutStates::STATE_PAYMENT_SELECTED,
     ];
 
-    /** @var AbstractBrowser */
-    private $client;
-
     /** @var ApiClientInterface */
     private $ordersClient;
-
-    /** @var ApiClientInterface */
-    private $countriesClient;
 
     /** @var ApiClientInterface */
     private $addressesClient;
@@ -73,28 +67,20 @@ final class CheckoutContext implements Context
     /** @var SharedStorageInterface */
     private $sharedStorage;
 
-    /** @var string */
-    private $authorizationHeader;
-
     /** @var string[] */
     private $content = [];
 
     public function __construct(
-        AbstractBrowser $client,
         ApiClientInterface $ordersClient,
-        ApiClientInterface $countriesClient,
         ApiClientInterface $addressesClient,
         ResponseCheckerInterface $responseChecker,
         RepositoryInterface $shippingMethodRepository,
         OrderRepositoryInterface $orderRepository,
         RepositoryInterface $paymentMethodRepository,
         ProductVariantResolverInterface $productVariantResolver,
-        SharedStorageInterface $sharedStorage,
-        string $authorizationHeader
+        SharedStorageInterface $sharedStorage
     ) {
-        $this->client = $client;
         $this->ordersClient = $ordersClient;
-        $this->countriesClient = $countriesClient;
         $this->addressesClient = $addressesClient;
         $this->responseChecker = $responseChecker;
         $this->shippingMethodRepository = $shippingMethodRepository;
@@ -102,7 +88,6 @@ final class CheckoutContext implements Context
         $this->paymentMethodRepository = $paymentMethodRepository;
         $this->productVariantResolver = $productVariantResolver;
         $this->sharedStorage = $sharedStorage;
-        $this->authorizationHeader = $authorizationHeader;
     }
 
     /**
@@ -154,7 +139,7 @@ final class CheckoutContext implements Context
     {
         $addressBook = $this->responseChecker->getCollection($this->addressesClient->index());
 
-        $addressType = $addressType . 'Address';
+        $addressType .= 'Address';
 
         $address = $this->getAddressByFieldValue($addressBook, 'street', $street);
 
@@ -307,19 +292,18 @@ final class CheckoutContext implements Context
     {
         $notes = $this->content['additionalNote'] ?? null;
 
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf('/new-api/shop/orders/%s/complete', $this->sharedStorage->get('cart_token')),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'notes' => $notes,
-            ], \JSON_THROW_ON_ERROR)
-        );
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $this->sharedStorage->get('cart_token'),
+            HTTPRequest::METHOD_PATCH,
+            'complete');
 
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $request->setContent(['notes' => $notes]);
+
+        $this->ordersClient->executeCustomRequest($request);
+
+        $response = $this->ordersClient->getLastResponse();
 
         if ($response->getStatusCode() === 400) {
             return;
@@ -344,20 +328,17 @@ final class CheckoutContext implements Context
      */
     public function iProceededWithShippingMethod(ShippingMethodInterface $shippingMethod): void
     {
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf(
-                '/new-api/shop/orders/%s/shipments/%s',
-                $this->sharedStorage->get('cart_token'),
-                $this->getCart()['shipments'][0]['id']
-            ),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'shippingMethodCode' => $shippingMethod->getCode(),
-            ], \JSON_THROW_ON_ERROR)
+        $request = Request::customItemAction(
+            'shop',
+        'orders',
+            $this->sharedStorage->get('cart_token'),
+            HTTPRequest::METHOD_PATCH,
+            sprintf('shipments/%s' , $this->getCart()['shipments'][0]['id'])
         );
+
+        $request->setContent(['shippingMethodCode' => $shippingMethod->getCode()]);
+
+        $this->ordersClient->executeCustomRequest($request);
     }
 
     /**
@@ -390,47 +371,22 @@ final class CheckoutContext implements Context
      * @When I proceed selecting :paymentMethod payment method
      * @When /^the (?:customer|visitor) proceed with ("[^"]+" payment)$/
      * @Given /^the (?:customer|visitor) has proceeded ("[^"]+" payment)$/
-     * @Given /^the visitor try to proceed with ("[^"]+" payment) in the customer cart$/
-     * @When /^I try to change payment method to ("[^"]+" payment)$/
-     */
-    public function iChoosePaymentMethod(PaymentMethodInterface $paymentMethod): void
-    {
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf(
-                '/new-api/shop/orders/%s/payments/%s',
-                $this->sharedStorage->get('cart_token'),
-                $this->getCart()['payments'][0]['id']
-            ),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'paymentMethodCode' => $paymentMethod->getCode(),
-            ], \JSON_THROW_ON_ERROR)
-        );
-    }
-
-    /**
      * @When I try to change payment method to :paymentMethod payment
      * @When I change payment method to :paymentMethod after checkout
      */
-    public function iChangePaymentMethod(PaymentMethodInterface $paymentMethod): void
+    public function iChoosePaymentMethod(PaymentMethodInterface $paymentMethod): void
     {
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf(
-                '/new-api/shop/orders/%s/payments/%s',
-                $this->sharedStorage->get('cart_token'),
-                $this->getCart()['payments'][0]['id']
-            ),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'paymentMethodCode' => $paymentMethod->getCode(),
-            ], \JSON_THROW_ON_ERROR)
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $this->sharedStorage->get('cart_token'),
+            HTTPRequest::METHOD_PATCH,
+            \sprintf('payments/%s', $this->getCart()['payments'][0]['id'])
         );
+
+        $request->setContent(['paymentMethodCode' => $paymentMethod->getCode()]);
+
+        $this->ordersClient->executeCustomRequest($request);
     }
 
     /**
@@ -493,8 +449,7 @@ final class CheckoutContext implements Context
     ): void {
         $this->iConfirmMyOrder();
 
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
 
         Assert::same($response->getStatusCode(), 400);
 
@@ -511,9 +466,9 @@ final class CheckoutContext implements Context
      */
     public function iShouldNotBeAbleToSelectPaymentMethod(string $paymentMethodName): void
     {
-        $paymentMethods = $this->getPossiblePaymentMethods($paymentMethodName);
+        $paymentMethods = $this->getPossiblePaymentMethods();
 
-        Assert::false(array_search($paymentMethodName, array_column($paymentMethods, 'name')));
+        Assert::false(array_search($paymentMethodName, array_column($paymentMethods, 'name'), true));
     }
 
     /**
@@ -521,9 +476,9 @@ final class CheckoutContext implements Context
      */
     public function iShouldBeAbleToSelectPaymentMethod(string $paymentMethodName): void
     {
-        $paymentMethods = $this->getPossiblePaymentMethods($paymentMethodName);
+        $paymentMethods = $this->getPossiblePaymentMethods();
 
-        Assert::notFalse(array_search($paymentMethodName, array_column($paymentMethods, 'name')));
+        Assert::notFalse(array_search($paymentMethodName, array_column($paymentMethods, 'name'), true));
     }
 
     /**
@@ -531,7 +486,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldHavePaymentMethodAvailableAsTheChoice(string $paymentMethodName, string $choice): void
     {
-        $paymentMethods = $this->getPossiblePaymentMethods($paymentMethodName);
+        $paymentMethods = $this->getPossiblePaymentMethods();
         Assert::notEmpty($paymentMethods);
 
         if ($choice === 'first') {
@@ -547,6 +502,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldStillBeOnTheCheckoutAddressingStep(): void
     {
+        //Assert::same($this->getCheckoutState(), OrderCheckoutStates::STATE_CART);
         Assert::same($this->getCart()['checkoutState'], OrderCheckoutStates::STATE_CART);
     }
 
@@ -566,8 +522,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldNotSeeAnyInformationAboutPaymentMethod(): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
 
         Assert::true(empty($this->responseChecker->getResponseContent($response)['payments']));
     }
@@ -593,8 +548,7 @@ final class CheckoutContext implements Context
      */
     public function myOrdersPaymentMethodShouldBe(PaymentMethodInterface $paymentMethod): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
         Assert::same(
             $this->responseChecker->getResponseContent($response)['payments'][0]['method']['name'],
             $paymentMethod->getName()
@@ -606,8 +560,7 @@ final class CheckoutContext implements Context
      */
     public function myOrdersShippingMethodShouldBe(ShippingMethodInterface $shippingMethod): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
         Assert::same(
             $this->responseChecker->getResponseContent($response)['shipments'][0]['method']['translations']['en_US']['name'],
             $shippingMethod->getName()
@@ -648,8 +601,7 @@ final class CheckoutContext implements Context
         $this->iShouldBeOnTheCheckoutCompleteStep();
         $this->iConfirmMyOrder();
 
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
         Assert::same($this->responseChecker->getError($response), 'An empty order cannot be completed.');
     }
 
@@ -704,8 +656,7 @@ final class CheckoutContext implements Context
      */
     public function myOrderTotalShouldBe(int $total): void
     {
-        $responseTotal = $this->responseChecker->getValue($this->client->getResponse(), 'total');
-        Assert::same($total, (int) $responseTotal);
+        Assert::same($total, (int) $this->getCart()['total']);
     }
 
     /**
@@ -713,7 +664,7 @@ final class CheckoutContext implements Context
      */
     public function myOrderPromotionTotalShouldBe(int $promotionTotal): void
     {
-        $responsePromotionTotal = $this->responseChecker->getValue($response = $this->client->getResponse(), 'orderPromotionTotal');
+        $responsePromotionTotal = $this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'orderPromotionTotal');
 
         Assert::same($promotionTotal, $responsePromotionTotal);
     }
@@ -723,7 +674,7 @@ final class CheckoutContext implements Context
      */
     public function myTaxTotalShouldBe(int $taxTotal): void
     {
-        $responseTaxTotal = $this->responseChecker->getValue($this->client->getResponse(), 'taxTotal');
+        $responseTaxTotal = $this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'taxTotal');
 
         Assert::same($taxTotal, $responseTaxTotal);
     }
@@ -733,7 +684,10 @@ final class CheckoutContext implements Context
      */
     public function iShouldHaveProductsInTheCart(int $quantity, string $productName): void
     {
-        Assert::true($this->hasProductWithNameAndQuantityInCart($productName, $quantity), sprintf('There is no product %s with quantity %d.', $productName, $quantity));
+        Assert::true(
+            $this->hasProductWithNameAndQuantityInCart($productName, $quantity),
+            sprintf('There is no product %s with quantity %d.', $productName, $quantity)
+        );
     }
 
     /**
@@ -752,7 +706,7 @@ final class CheckoutContext implements Context
             return;
         }
 
-        Assert::same($this->responseChecker->getValue($this->client->getResponse(), 'orderPromotionTotal'), $discount);
+        Assert::same($this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'orderPromotionTotal'), $discount);
     }
 
     /**
@@ -760,7 +714,7 @@ final class CheckoutContext implements Context
      */
     public function thereShouldBeNoTaxesCharged(): void
     {
-        Assert::same($this->responseChecker->getValue($this->client->getResponse(), 'taxTotal'), 0);
+        Assert::same($this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'taxTotal'), 0);
     }
 
     /**
@@ -768,7 +722,7 @@ final class CheckoutContext implements Context
      */
     public function myOrderLocaleShouldBe(string $localeCode): void
     {
-        Assert::same($this->responseChecker->getValue($this->client->getResponse(), 'localeCode'), $localeCode);
+        Assert::same($this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'localeCode'), $localeCode);
     }
 
     /**
@@ -776,7 +730,7 @@ final class CheckoutContext implements Context
      */
     public function myOrderShippingShouldBe(int $price): void
     {
-        Assert::same($this->responseChecker->getValue($this->client->getResponse(), 'shippingTotal'), $price);
+        Assert::same($this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'shippingTotal'), $price);
     }
 
     /**
@@ -784,7 +738,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldNotSeeShippingTotal(): void
     {
-        Assert::same($this->responseChecker->getValue($this->client->getResponse(), 'shippingTotal'), 0);
+        Assert::same($this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'shippingTotal'), 0);
     }
 
     /**
@@ -792,8 +746,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldBeNotifiedThatTheAndTheInShippingDetailsAreRequired(string $firstElement, string $secondElement, string $detailType): void
     {
-        /** @var Response|null $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
 
         Assert::true($response->getStatusCode() === 400);
 
@@ -816,7 +769,7 @@ final class CheckoutContext implements Context
     public function iShouldBeInformedThatThisProductHasBeenDisabled(ProductInterface $product): void
     {
         Assert::true($this->isViolationWithMessageInResponse(
-            $this->client->getResponse(),
+            $this->ordersClient->getLastResponse(),
             sprintf('This product %s has been disabled.', $product->getName())
         ));
     }
@@ -826,7 +779,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldNotSeeTheThankYouPage(): void
     {
-        Assert::same($this->client->getResponse()->getStatusCode(), 400);
+        Assert::same($this->ordersClient->getLastResponse()->getStatusCode(), 400);
     }
 
     /**
@@ -853,8 +806,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldBeInformedThatThisPaymentMethodHasBeenDisabled(PaymentMethodInterface $paymentMethod): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
 
         Assert::same($response->getStatusCode(), 400);
 
@@ -896,8 +848,7 @@ final class CheckoutContext implements Context
      */
     public function iShouldBeInformedThatCartIsNoLongerAvailable(): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
 
         Assert::same($response->getStatusCode(), 404);
 
@@ -928,13 +879,12 @@ final class CheckoutContext implements Context
      */
     public function iShouldNotBeAbleToAddressAnOrderWithAnEmptyCart(): void
     {
-        $this->client->getResponse();
+        $this->ordersClient->getLastResponse();
     }
 
     private function assertProvinceMessage(string $addressType): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
 
         Assert::same($response->getStatusCode(), 400);
         Assert::true($this->isViolationWithMessageInResponse(
@@ -960,33 +910,23 @@ final class CheckoutContext implements Context
         return false;
     }
 
-    private function getHeaders(array $headers = []): array
-    {
-        if (empty($headers)) {
-            $headers = ['HTTP_ACCEPT' => 'application/ld+json', 'CONTENT_TYPE' => 'application/merge-patch+json'];
-        }
-
-        if ($this->sharedStorage->has('token')) {
-            $headers['HTTP_' . $this->authorizationHeader] = 'Bearer ' . $this->sharedStorage->get('token');
-        }
-
-        return $headers;
-    }
-
     private function addressOrder(array $content): void
     {
         if (!array_key_exists('email', $content)) {
             $content['email'] = null;
         }
 
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf('/new-api/shop/orders/%s/address', $this->getCartTokenValue()),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode($content, \JSON_THROW_ON_ERROR)
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $this->getCartTokenValue(),
+            HTTPRequest::METHOD_PATCH,
+            'address'
         );
+
+        $request->setContent($content);
+
+        $this->ordersClient->executeCustomRequest($request);
     }
 
     private function getCart(): array
@@ -1009,24 +949,24 @@ final class CheckoutContext implements Context
 
     private function getCheckoutState(): string
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse(); //don't touch
 
         return $this->responseChecker->getValue($response, 'checkoutState');
     }
 
     private function getCartShippingMethods(array $cart): array
     {
-        $this->client->request(
-            Request::METHOD_GET,
-            \sprintf('/new-api/shop/orders/%s/shipments/%s/methods', $cart['tokenValue'], $cart['shipments'][0]['id']),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([], \JSON_THROW_ON_ERROR)
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $cart['tokenValue'],
+            HTTPRequest::METHOD_GET,
+            sprintf('shipments/%s/methods',$cart['shipments'][0]['id'])
         );
 
-        return $this->responseChecker->getCollection($this->client->getResponse());
+        $this->ordersClient->executeCustomRequest($request);
+
+        return $this->responseChecker->getCollection($this->ordersClient->getLastResponse());
     }
 
     private function hasShippingMethod(ShippingMethodInterface $shippingMethod): bool
@@ -1044,8 +984,8 @@ final class CheckoutContext implements Context
     {
         foreach ($this->getCartShippingMethods($this->getCart()) as $cartShippingMethod) {
             if (
-                $cartShippingMethod['shippingMethod']['code'] === $shippingMethod->getCode() &&
-                $cartShippingMethod['cost'] === $fee
+                $cartShippingMethod['cost'] === $fee &&
+                $cartShippingMethod['shippingMethod']['code'] === $shippingMethod->getCode()
             ) {
                 return true;
             }
@@ -1054,38 +994,36 @@ final class CheckoutContext implements Context
         return false;
     }
 
-    private function getPossiblePaymentMethods(string $paymentMethodName): array
+    private function getPossiblePaymentMethods(): array
     {
         /** @var OrderInterface|null $order */
         $order = $this->orderRepository->findCartByTokenValue($this->sharedStorage->get('cart_token'));
+        Assert::notNull($order);
 
         if (!$order->getLastPayment()) {
             return [];
         }
 
-        $this->client->request(
-            Request::METHOD_GET,
-            \sprintf('/new-api/shop/orders/%s/payments/%s/methods',
-                $this->sharedStorage->get('cart_token'),
-                $order->getLastPayment()->getId()),
-            [],
-            [],
-            $this->getHeaders()
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $this->sharedStorage->get('cart_token'),
+            HTTPRequest::METHOD_GET,
+            sprintf('payments/%s/methods',$order->getLastPayment()->getId())
         );
 
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $this->ordersClient->executeCustomRequest($request);
 
-        return json_decode($response->getContent(), true)['hydra:member'];
+        return $this->responseChecker->getCollection($this->ordersClient->getLastResponse());
     }
 
     private function hasProductWithNameAndQuantityInCart(string $productName, int $quantity): bool
     {
         /** @var array $items */
-        $items = $this->responseChecker->getValue($this->client->getResponse(), 'items');
+        $items = $this->responseChecker->getValue($this->ordersClient->getLastResponse(), 'items');
 
         foreach ($items as $item) {
-            if ($item['variant']['translations']['en_US']['name'] === $productName && $item['quantity'] === $quantity) {
+            if ($item['productName'] === $productName && $item['quantity'] === $quantity) {
                 return true;
             }
         }
@@ -1106,13 +1044,13 @@ final class CheckoutContext implements Context
 
     private function getViolation(array $violations, string $element): array
     {
-        return $violations[array_search($element, array_column($violations, 'propertyPath'))];
+        return $violations[array_search($element, array_column($violations, 'propertyPath'), true)];
     }
 
     private function hasFullNameInAddress(string $fullName, string $addressType): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
+
         $names = explode(' ', $fullName);
         $addressType .= 'Address';
 
@@ -1128,8 +1066,7 @@ final class CheckoutContext implements Context
 
     private function hasProvinceNameInAddress(string $provinceName, string $addressType): void
     {
-        /** @var Response $response */
-        $response = $this->client->getResponse();
+        $response = $this->ordersClient->getLastResponse();
         $addressType .= 'Address';
 
         Assert::same(
@@ -1140,42 +1077,38 @@ final class CheckoutContext implements Context
 
     private function putProductToCart(ProductInterface $product, string $tokenValue, int $quantity = 1): void
     {
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf(
-                '/new-api/shop/orders/%s/items',
-                $tokenValue,
-            ),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'productCode' => $product->getCode(),
-                'productVariantCode' => $this->productVariantResolver->getVariant($product)->getCode(),
-                'quantity' => $quantity,
-            ], \JSON_THROW_ON_ERROR)
+        Assert::notNull($productVariant = $this->productVariantResolver->getVariant($product));
+
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $tokenValue,
+            HTTPRequest::METHOD_PATCH,
+            'items'
         );
 
-        $this->sharedStorage->set('response', $this->client->getResponse());
+        $request->setContent([
+            'productCode' => $product->getCode(),
+            'productVariantCode' => $productVariant->getCode(),
+            'quantity' => $quantity,
+        ]);
+
+        $this->sharedStorage->set('response', $this->ordersClient->executeCustomRequest($request));
     }
 
     private function removeOrderItemFromCart(int $orderItemId, string $tokenValue): void
     {
-        $this->client->request(
-            Request::METHOD_PATCH,
-            \sprintf(
-                '/new-api/shop/orders/%s/remove',
-                $tokenValue,
-            ),
-            [],
-            [],
-            $this->getHeaders(),
-            json_encode([
-                'orderItemId' => $orderItemId,
-            ], \JSON_THROW_ON_ERROR)
+        $request = Request::customItemAction(
+            'shop',
+            'orders',
+            $tokenValue,
+            HTTPRequest::METHOD_PATCH,
+            'remove'
         );
 
-        $this->sharedStorage->set('response', $this->client->getResponse());
+        $request->setContent(['orderItemId' => $orderItemId]);
+
+        $this->sharedStorage->set('response', $this->ordersClient->executeCustomRequest($request));
     }
 
     private function getAddressByFieldValue(array $addressBook, string $fieldName, string $fieldValue): array
