@@ -320,6 +320,7 @@ final class CheckoutContext implements Context
             return;
         }
 
+        $this->sharedStorage->set('response', $response);
         $this->sharedStorage->set(
             'order_number',
             $this->responseChecker->getValue($response, 'number')
@@ -1149,6 +1150,8 @@ final class CheckoutContext implements Context
                 'quantity' => $quantity,
             ], \JSON_THROW_ON_ERROR)
         );
+
+        $this->sharedStorage->set('response', $this->client->getResponse());
     }
 
     private function removeOrderItemFromCart(int $orderItemId, string $tokenValue): void
@@ -1166,6 +1169,8 @@ final class CheckoutContext implements Context
                 'orderItemId' => $orderItemId,
             ], \JSON_THROW_ON_ERROR)
         );
+
+        $this->sharedStorage->set('response', $this->client->getResponse());
     }
 
     private function getAddressByFieldValue(array $addressBook, string $fieldName, string $fieldValue): array

@@ -342,7 +342,7 @@ final class CartContext implements Context
      */
     public function iShouldBeInformedThatCartItemsAreNoLongerAvailable(): void
     {
-        $response = $this->cartsClient->getLastResponse();
+       $response = $this->sharedStorage->get('response') ?? $this->cartsClient->getLastResponse();
 
         Assert::same($response->getStatusCode(), 404);
 
@@ -520,6 +520,8 @@ final class CartContext implements Context
         $request->updateContent(['orderItemId' => $orderItemId, 'newQuantity' => $quantity]);
 
         $this->cartsClient->executeCustomRequest($request);
+
+        $this->sharedStorage->set('response', $this->cartsClient->getLastResponse());
     }
 
     private function hasItemWithNameAndQuantity(Response $response, string $productName, int $quantity): bool
