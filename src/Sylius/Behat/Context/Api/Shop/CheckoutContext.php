@@ -126,6 +126,7 @@ final class CheckoutContext implements Context
      * @When I go to the checkout addressing step
      * @Then there should be information about no available shipping methods
      * @Then I should be informed that my order cannot be shipped to this address
+     * @Then I should not be able to address an order with an empty cart
      */
     public function iAmAtTheCheckoutAddressingStep(): void
     {
@@ -297,13 +298,12 @@ final class CheckoutContext implements Context
             'orders',
             $this->sharedStorage->get('cart_token'),
             HTTPRequest::METHOD_PATCH,
-            'complete');
+            'complete'
+        );
 
         $request->setContent(['notes' => $notes]);
 
-        $this->ordersClient->executeCustomRequest($request);
-
-        $response = $this->ordersClient->getLastResponse();
+        $response = $this->ordersClient->executeCustomRequest($request);
 
         if ($response->getStatusCode() === 400) {
             return;
@@ -330,7 +330,7 @@ final class CheckoutContext implements Context
     {
         $request = Request::customItemAction(
             'shop',
-        'orders',
+            'orders',
             $this->sharedStorage->get('cart_token'),
             HTTPRequest::METHOD_PATCH,
             sprintf('shipments/%s' , $this->getCart()['shipments'][0]['id'])
@@ -502,7 +502,6 @@ final class CheckoutContext implements Context
      */
     public function iShouldStillBeOnTheCheckoutAddressingStep(): void
     {
-        //Assert::same($this->getCheckoutState(), OrderCheckoutStates::STATE_CART);
         Assert::same($this->getCart()['checkoutState'], OrderCheckoutStates::STATE_CART);
     }
 
@@ -874,14 +873,6 @@ final class CheckoutContext implements Context
         $this->assertProvinceMessage('billingAddress');
     }
 
-    /**
-     * @Then I should not be able to address an order with an empty cart
-     */
-    public function iShouldNotBeAbleToAddressAnOrderWithAnEmptyCart(): void
-    {
-        $this->ordersClient->getLastResponse();
-    }
-
     private function assertProvinceMessage(string $addressType): void
     {
         $response = $this->ordersClient->getLastResponse();
@@ -949,7 +940,7 @@ final class CheckoutContext implements Context
 
     private function getCheckoutState(): string
     {
-        $response = $this->ordersClient->getLastResponse(); //don't touch
+        $response = $this->ordersClient->getLastResponse();
 
         return $this->responseChecker->getValue($response, 'checkoutState');
     }
