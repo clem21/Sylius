@@ -99,6 +99,8 @@ final class CartContext implements Context
     public function iAddThisProductToTheCart(ProductInterface $product, ?string $tokenValue): void
     {
         $this->putProductToCart($product, $tokenValue);
+
+        $this->sharedStorage->set('product', $product);
     }
 
     /**
@@ -314,6 +316,7 @@ final class CartContext implements Context
     }
 
     /**
+     * @Then /^(its|theirs) price should be decreased by ("[^"]+")$/
      * @Then /^(product "[^"]+") price should be decreased by ("[^"]+")$/
      */
     public function itsPriceShouldBeDecreasedBy(ProductInterface $product, int $amount): void
