@@ -149,6 +149,9 @@
     "ergebnis/json-printer": {
         "version": "3.0.2"
     },
+    "fakerphp/faker": {
+        "version": "v1.12.0"
+    },
     "felixfbecker/advanced-json-rpc": {
         "version": "v3.1.1"
     },
