@@ -377,7 +377,7 @@ final class CartContext implements Context
      */
     public function iShouldBeInformedThatCartItemsAreNoLongerAvailable(): void
     {
-       $response = $this->sharedStorage->get('response') ?? $this->cartsClient->getLastResponse();
+        $response = $this->sharedStorage->get('response') ?? $this->cartsClient->getLastResponse();
 
         Assert::same($response->getStatusCode(), 404);
 
