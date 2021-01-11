@@ -39,9 +39,9 @@ class Kernel extends HttpKernel
 
     public const MINOR_VERSION = '9';
 
-    public const RELEASE_VERSION = '8';
+    public const RELEASE_VERSION = '9';
 
-    public const EXTRA_VERSION = '';
+    public const EXTRA_VERSION = 'DEV';
 
     public function __construct(string $environment, bool $debug)
     {
